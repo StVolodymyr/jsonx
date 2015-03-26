@@ -17,7 +17,7 @@ typedef struct{
   unsigned char *cur;
   size_t        offset;
   ERL_NIF_TERM  input;
-  ERL_NIF_TERM  format;  //struct, eep18, proplist
+  ERL_NIF_TERM  format;  //struct, eep18, proplist, map
   ERL_NIF_TERM  number_format;  //float, decimal
   ERL_NIF_TERM  error;
   ERL_NIF_TERM  *stack_top;
@@ -30,6 +30,7 @@ static inline ERL_NIF_TERM parse_json(State* st);
 static inline ERL_NIF_TERM parse_array(State* st);
 static inline ERL_NIF_TERM parse_object(State* st);
 static inline ERL_NIF_TERM parse_object_to_record(State* st);
+static inline ERL_NIF_TERM parse_object_to_map(State* st);
 static inline ERL_NIF_TERM parse_string(State* st);
 static inline ERL_NIF_TERM parse_string_as_existing_atom(State* st);
 static inline ERL_NIF_TERM parse_number(State* st);
@@ -96,15 +97,15 @@ parse_array(State* st){
       unsigned char c = look_ah(st);
       st->cur++;
       if(c == ','){
-	continue;
+  continue;
       }else if(c == ']'){
-	ERL_NIF_TERM *down =  st->stack_down + stack_off;
-	term = enif_make_list_from_array(st->env, down, st->stack_top - down);
-	st->stack_top = down;
-	return term;
+  ERL_NIF_TERM *down =  st->stack_down + stack_off;
+  term = enif_make_list_from_array(st->env, down, st->stack_top - down);
+  st->stack_top = down;
+  return term;
       }else{
-	st->error = st->priv->am_esyntax;
-	return (ERL_NIF_TERM)0;
+  st->error = st->priv->am_esyntax;
+  return (ERL_NIF_TERM)0;
       }
     }else{
       return (ERL_NIF_TERM)0;
@@ -129,23 +130,23 @@ parse_object(State* st){
   for(;;){
     if(look_ah(st) == '"'){
       if((key = parse_string(st))){
-	if(look_ah(st) == ':'){
-	  st->cur++;
-	  if((val = parse_json(st))){
-	    pair = enif_make_tuple2(st->env, key, val);
-	    push_term(st, pair);
-	    c = look_ah(st);
-	    st->cur++;
-	    if(c == ','){
-	      continue;
-	    }else if(c == '}'){
-	      ERL_NIF_TERM *down =  st->stack_down + stack_off;
-	      plist = enif_make_list_from_array(st->env, down, st->stack_top - down);
-	      st->stack_top = down;
-	      goto ret;
-	    }
-	  }
-	}
+  if(look_ah(st) == ':'){
+    st->cur++;
+    if((val = parse_json(st))){
+      pair = enif_make_tuple2(st->env, key, val);
+      push_term(st, pair);
+      c = look_ah(st);
+      st->cur++;
+      if(c == ','){
+        continue;
+      }else if(c == '}'){
+        ERL_NIF_TERM *down =  st->stack_down + stack_off;
+        plist = enif_make_list_from_array(st->env, down, st->stack_top - down);
+        st->stack_top = down;
+        goto ret;
+      }
+    }
+  }
       }
     }
     if(!st->error){
@@ -195,38 +196,38 @@ parse_object_to_record(State* st){
   for(;;){
     if(look_ah(st) == '"'){
       if((key = parse_string_as_existing_atom(st))){
-	//FIXME search in sorted array
-	int key_num = -1;
-	for(i = 0; i < st->resource->ukeys_cnt; i++){
-	  if(enif_is_identical(ukeys[i], key)){
-	    key_num = i;
-	    break;
-	  }
-	}
-	if(key_num == -1)
-	  goto undefrec;
-	set_bit(key_num, (long*)st->stack_down + mask_off);
-	push_term(st, key);
-	if(look_ah(st) == ':'){
-	  st->cur++;
-	  if((val = parse_json(st))){
-	    push_term(st, val);
-	    pair_cnt++;
-	    c = look_ah(st);
-	    st->cur++;
-	    if(c == ','){
-	      continue;
-	    }else if(c == '}'){
-	      goto ret;
-	    }
-	  }
-	}
+  //FIXME search in sorted array
+  int key_num = -1;
+  for(i = 0; i < st->resource->ukeys_cnt; i++){
+    if(enif_is_identical(ukeys[i], key)){
+      key_num = i;
+      break;
+    }
+  }
+  if(key_num == -1)
+    goto undefrec;
+  set_bit(key_num, (long*)st->stack_down + mask_off);
+  push_term(st, key);
+  if(look_ah(st) == ':'){
+    st->cur++;
+    if((val = parse_json(st))){
+      push_term(st, val);
+      pair_cnt++;
+      c = look_ah(st);
+      st->cur++;
+      if(c == ','){
+        continue;
+      }else if(c == '}'){
+        goto ret;
+      }
+    }
+  }
       }else{
-	if(st->error){
-	  return (ERL_NIF_TERM)0;
-	}else{
-	  goto undefrec;
-	}
+  if(st->error){
+    return (ERL_NIF_TERM)0;
+  }else{
+    goto undefrec;
+  }
       }
     }
     if(!st->error)
@@ -235,7 +236,7 @@ parse_object_to_record(State* st){
   }
  ret:
   record_num = find_mask(st->resource->ukeys_cnt, (long *)(st->stack_down + mask_off),
-			 st->resource->records_cnt, masks_base);
+       st->resource->records_cnt, masks_base);
   if(record_num < 0)
     goto undefrec;
   results_off =  st->stack_top - st->stack_down;
@@ -249,7 +250,7 @@ parse_object_to_record(State* st){
     for(k = 0; k < arity; k++){
       pairs = st->stack_down + pairs_off;
       if(enif_is_identical(pairs[2 * k], ukeys[knum])){
-	push_term(st, pairs[2 * k + 1]);
+  push_term(st, pairs[2 * k + 1]);
       }
     }
   }
@@ -268,6 +269,63 @@ parse_object_to_record(State* st){
 }
 
 static inline ERL_NIF_TERM
+parse_object_to_map(State* st){
+  ERL_NIF_TERM *plist, *plist2;
+  ERL_NIF_TERM p, key, val, pair;
+  unsigned char c;
+
+  st->cur++;
+  if(look_ah(st) == '}'){
+    st->cur++;
+    p = enif_make_new_map(st->env);
+    plist = &p;
+    goto ret;
+  }
+  size_t stack_off =  st->stack_top - st->stack_down;
+  for(;;){
+    if(look_ah(st) == '"'){
+      if((key = parse_string(st))){
+        if(look_ah(st) == ':'){
+          st->cur++;
+          if((val = parse_json(st))){
+            pair = enif_make_tuple2(st->env, key, val);
+            push_term(st, pair);
+            c = look_ah(st);
+            st->cur++;
+            if(c == ','){
+               continue;
+            }else if(c == '}'){
+              ERL_NIF_TERM *down =  st->stack_down + stack_off;
+              const ERL_NIF_TERM *tuple;
+              int arity = 2;
+              int count = 0;
+              p = enif_make_new_map(st->env);
+              plist = &p;
+              plist2 = malloc(sizeof(ERL_NIF_TERM));
+              for (count=0; count < (st->stack_top - down); count++) {
+                enif_get_tuple(st->env, down[count], &arity, &tuple);
+                enif_make_map_put(st->env, *plist, tuple[0], tuple[1], plist2);
+                plist = plist2;
+                plist2 = &p;
+              }
+              st->stack_top = down;
+              goto ret;
+            }
+          }
+        }
+      }
+    }
+    if(!st->error){
+      st->error = st->priv->am_esyntax;
+    }
+    return (ERL_NIF_TERM)0;
+  }
+ ret:
+  return enif_make_tuple2(st->env, st->priv->am_map, *plist);
+  assert(0);
+}
+
+static inline ERL_NIF_TERM
 parse_string(State* st){
   unsigned char *endptr;
   unsigned char *endstr;
@@ -279,10 +337,10 @@ parse_string(State* st){
       return ret;
     }else if(*endptr == '\\'){
       if(check_with_unescape_jstr(endptr, &endstr, &endptr)){
-	unsigned char *dst = enif_make_new_binary(st->env, endstr - st->cur - 1, &ret);
-	memcpy(dst, st->cur + 1, endstr - st->cur - 1);
-	st->cur = endptr + 1;
-	return ret;
+  unsigned char *dst = enif_make_new_binary(st->env, endstr - st->cur - 1, &ret);
+  memcpy(dst, st->cur + 1, endstr - st->cur - 1);
+  st->cur = endptr + 1;
+  return ret;
       }
     }
   }
@@ -297,17 +355,17 @@ parse_string_as_existing_atom(State* st){
   if(check_noescaped_jstr(st->cur, &endptr)){
     if(*endptr == '"'){
       if(!enif_make_existing_atom_len(st->env, (const char*)(st->cur + 1), endptr - st->cur - 1,  &atom, ERL_NIF_LATIN1)){
-	  return (ERL_NIF_TERM)0;
-	}
+    return (ERL_NIF_TERM)0;
+  }
       st->cur = endptr + 1;
       return atom;
     }else if(*endptr == '\\'){
       if(check_with_unescape_jstr(endptr, &endstr, &endptr)){
-	if(!enif_make_existing_atom_len(st->env, (const char*)(st->cur + 1), endstr - st->cur - 1,  &atom, ERL_NIF_LATIN1)){
-	  return (ERL_NIF_TERM)0;
-	}
-	st->cur = endptr + 1;
-	return atom;
+  if(!enif_make_existing_atom_len(st->env, (const char*)(st->cur + 1), endstr - st->cur - 1,  &atom, ERL_NIF_LATIN1)){
+    return (ERL_NIF_TERM)0;
+  }
+  st->cur = endptr + 1;
+  return atom;
       }
     }
   }
@@ -450,7 +508,9 @@ parse_json(State *st){
   ERL_NIF_TERM num;
   switch(look_ah(st)){
   case '\"' : return parse_string(st);
-  case '{'  : return (st->resource ? parse_object_to_record(st) : parse_object(st));
+  case '{'  : return (st->resource ? 
+      parse_object_to_record(st) : 
+      (st->format == st->priv->am_map ? parse_object_to_map(st) : parse_object(st)));
   case '['  : return parse_array(st);
   case 't'  : return parse_true(st);
   case 'f'  : return parse_false(st);
@@ -506,7 +566,7 @@ decode_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]){
   enif_free(st.buf);
   if(!ret){
     return enif_make_tuple3(env, st.priv->am_error, st.error,
-			    enif_make_ulong(env, st.cur - (st.buf + st.offset)));
+          enif_make_ulong(env, st.cur - (st.buf + st.offset)));
   }
   return ret;
 }

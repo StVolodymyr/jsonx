@@ -23,6 +23,7 @@
 %%       <li>any other atom     -> string</li>
 %%       <li>binary             -> string</li>
 %%       <li>number             -> number</li>
+%%       <li>map                -> object</li>
 %%       <li>{struct, PropList} -> object</li>
 %%       <li>{PropList}         -> object</li>
 %%       <li>PropList           -> object</li>
@@ -80,7 +81,7 @@ decode(JSON) ->
 %%@doc Decode JSON to Erlang term with options.
 -spec decode(JSON, OPTIONS) -> JSON_TERM when
       JSON      :: binary(),
-      OPTIONS   :: [{format, struct|eep18|proplist} | {number_format, float|decimal}],
+      OPTIONS   :: [{format, struct|eep18|map|proplist} | {number_format, float|decimal}],
       JSON_TERM :: any().
 decode(JSON, Options) ->
     {Object, Float} = parse_format(Options),
@@ -98,7 +99,7 @@ decoder(Records_desc) ->
 %%@doc Build a JSON decoder with output undefined objects.
 -spec decoder(RECORDS_DESC, OPTIONS) -> DECODER when
       RECORDS_DESC :: [{tag, [names]}],
-      OPTIONS   :: [{format, struct|eep18|proplist} | {number_format, float|decimal}],
+      OPTIONS   :: [{format, struct|eep18|map|proplist} | {number_format, float|decimal}],
       DECODER      :: function().
 decoder(Records_desc, Options) ->
     {RecCnt, UKeyCnt, KeyCnt, UKeys, Keys, Records3} = prepare_for_dec(Records_desc),
@@ -138,7 +139,7 @@ parse_format(X) ->
     parse_format(lists:reverse(X), eep18, float).
 parse_format([], Object, Float) ->
     {Object, Float};
-parse_format([{format, Format} | T], _, Float) when Format == struct orelse Format == proplist orelse Format == eep18 ->
+parse_format([{format, Format} | T], _, Float) when Format == struct orelse Format == proplist orelse Format == eep18 orelse Format == map ->
     parse_format(T, Format, Float);
 parse_format([{number_format, Format} | T], Object, _) when Format == float orelse Format == decimal ->
     parse_format(T, Object, Format);
@@ -227,7 +228,7 @@ init() ->
         Dir ->
             filename:join(Dir, ?LIBNAME)
     end,
-	ok = erlang:load_nif(So, [[json, struct, proplist, eep18, no_match], [true, false, null],
+	ok = erlang:load_nif(So, [[json, struct, proplist, eep18, map, no_match], [true, false, null],
 			 [error, big_num, invalid_string, invalid_json, trailing_data, undefined_record]]).
 
 not_loaded(Line) ->
